@@ -1,18 +1,21 @@
-# RareForge Android Prototype
+# RareForge Android — Collection Overdrive
 
-RareForge is a standalone offline Android card-battle sandbox. It is not a modified Clash Royale client and does not connect to Supercell services.
+RareForge is an independent, offline Android card-battle sandbox. It is not a modified Clash Royale client and never connects to Supercell services.
 
-## Features
-- 12 original prototype units, all unlocked at Level 5
-- Default 2.0x multiplier for hitpoints and damage; adjustable from 1.0x to 5.0x
-- Displays HP, damage, attack interval, movement speed, and elixir-like cost
-- Simple local battle-power simulation
-- No network permissions or third-party game assets
+## Updated features
+- **432 unlocked cards**: 12 handcrafted original prototype units plus 420 generated original card entries.
+- **Unlimited local sandbox currency**: coins and gems are displayed as unlimited; this is an offline sandbox economy, not a change to any external game account.
+- **Persistent upgrades**: each card starts at Level 5, can be upgraded free up to Level 100, and its level is saved locally.
+- **Searchable collection**: search card names or roles, browse the full collection in pages, select any card, and inspect its boosted stats.
+- **Global boost controls**: raise or lower the HP/damage multiplier from 1.0× to 5.0×.
+- **Local battle simulation**: compares four-card teams using durability, damage rate, movement speed, level and boost.
+- **Offline-first**: no network permissions, no external account, no third-party game assets.
+- Creator credit: Satyendra Kumar Namdeo.
 
-## Build APK
-1. Open this repository in Android Studio.
-2. Install Android SDK Platform 35 if prompted and allow Gradle sync.
-3. Select **Build → Build APK(s)**. Output: `app/build/outputs/apk/debug/app-debug.apk`.
-4. Or use GitHub Actions: open **Actions → Build RareForge APK → Run workflow**, then download the `RareForge-debug-apk` artifact from the successful run.
+## Build and install
+1. Open the repository in Android Studio and sync Gradle.
+2. Install Android SDK Platform 35 if prompted.
+3. Build with Build → Build APK(s). The debug APK is at app/build/outputs/apk/debug/app-debug.apk.
+4. Or open Actions → Build RareForge APK, run the workflow, and download the RareForge-debug-apk artifact from the successful run.
 
-This is a prototype, not a full real-time tower-defense engine. It cannot change an official Clash Royale account.
+This is a standalone prototype and does not modify official game data, accounts, or servers.
