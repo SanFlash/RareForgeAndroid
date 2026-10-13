@@ -44,7 +44,7 @@ class MainActivity : Activity() {
         super.onCreate(savedInstanceState)
         window.statusBarColor = pageBackground
         window.navigationBarColor = pageBackground
-        cards.forEach { card -> levels[card.id] = prefs.getInt("level_\${card.id}", 5).coerceAtLeast(1) }
+        cards.forEach { card -> levels[card.id] = prefs.getInt("level_${card.id}", 5).coerceAtLeast(1) }
         selectedCardId = prefs.getInt("selected_card", 0).coerceIn(0, cards.lastIndex)
         buildUi()
     }
@@ -72,7 +72,7 @@ class MainActivity : Activity() {
             val id = originals.size + index
             val hp = 300 + ((index * 73) % 1050) + (index / 420) * 7
             val damage = 45 + ((index * 37) % 190) + index / 420
-            BattleCard(id, "\${prefixes[index % prefixes.size]} \${nouns[(index / prefixes.size) % nouns.size]} \${index + 1}",
+            BattleCard(id, "${prefixes[index % prefixes.size]} ${nouns[(index / prefixes.size) % nouns.size]} ${index + 1}",
                 roles[index % roles.size], icons[index % icons.size], hp, damage, .7f + (index % 16) * .1f,
                 .55f + (index % 12) * .1f, 2 + index % 5)
         }
@@ -91,7 +91,7 @@ class MainActivity : Activity() {
 
         val economy = panel()
         economy.addView(text("SANDBOX ACCOUNT", 12f, mint, true))
-        economy.addView(text("Coins  ∞     Gems  ∞     Cards unlocked  \${cards.size}", 18f, Color.WHITE, true).apply { setPadding(0, dp(7), 0, dp(4)) })
+        economy.addView(text("Coins  ∞     Gems  ∞     Cards unlocked  ${cards.size}", 18f, Color.WHITE, true).apply { setPadding(0, dp(7), 0, dp(4)) })
         economy.addView(text("Unlimited local sandbox currency • every catalog card is available • upgrades save automatically", 13f, muted, false))
         root.addView(economy, marginBottom(12))
 
@@ -101,7 +101,7 @@ class MainActivity : Activity() {
         boostPanel.addView(boostLabel)
         val controls = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
         controls.addView(button("−").apply { setOnClickListener { setBoost((boost - .25f).coerceAtLeast(1f)) } }, LinearLayout.LayoutParams(0, dp(44), 1f).apply { marginEnd = dp(8) })
-        controls.addView(button("+").apply { setOnClickListener { setBoost((boost + .25f).coerceAtMost(5f)) }, LinearLayout.LayoutParams(0, dp(44), 1f))
+        controls.addView(button("+").apply { setOnClickListener { setBoost((boost + .25f).coerceAtMost(5f)) } }, LinearLayout.LayoutParams(0, dp(44), 1f))
         boostPanel.addView(controls)
         boostPanel.addView(text("Adjust HP and damage from 1.0× to 5.0×.", 12f, muted, false).apply { setPadding(0, dp(4), 0, 0) })
         root.addView(boostPanel, marginBottom(12))
@@ -150,20 +150,20 @@ class MainActivity : Activity() {
         val card = cards[selectedCardId.coerceIn(0, cards.lastIndex)]
         val level = levels[card.id] ?: 5
         detailPanel.addView(text("SELECTED CARD • LEVEL $level", 11f, mint, true))
-        detailPanel.addView(text("\${card.icon}  \${card.name}", 21f, Color.WHITE, true).apply { setPadding(0, dp(5), 0, dp(5)) })
-        detailPanel.addView(text("\${card.role}   •   Unlocked", 13f, muted, false))
+        detailPanel.addView(text("${card.icon}  ${card.name}", 21f, Color.WHITE, true).apply { setPadding(0, dp(5), 0, dp(5)) })
+        detailPanel.addView(text("${card.role}   •   Unlocked", 13f, muted, false))
         val factor = 1.0 + (level - 1) * .08
-        detailPanel.addView(text("HP  \${(card.baseHp * boost * factor).roundToInt()}     Damage  \${(card.baseDamage * boost * factor).roundToInt()}", 15f, Color.WHITE, true).apply { setPadding(0, dp(8), 0, dp(3)) })
-        detailPanel.addView(text("Attack interval: \${String.format("%.1f", card.attackSeconds)}s  •  Speed: \${String.format("%.2f", card.speed)}  •  Cost: \${card.cost}", 12f, muted, false))
+        detailPanel.addView(text("HP  ${(card.baseHp * boost * factor).roundToInt()}     Damage  ${(card.baseDamage * boost * factor).roundToInt()}", 15f, Color.WHITE, true).apply { setPadding(0, dp(8), 0, dp(3)) })
+        detailPanel.addView(text("Attack interval: ${String.format("%.1f", card.attackSeconds)}s  •  Speed: ${String.format("%.2f", card.speed)}  •  Cost: ${card.cost}", 12f, muted, false))
         val upgrade = button(if (level >= 100) "MAX LEVEL REACHED" else "UPGRADE LEVEL • FREE")
         upgrade.isEnabled = level < 100
         upgrade.alpha = if (level >= 100) .55f else 1f
         upgrade.setOnClickListener {
             val next = ((levels[card.id] ?: 5) + 1).coerceAtMost(100)
             levels[card.id] = next
-            prefs.edit().putInt("level_\${card.id}", next).putInt("selected_card", card.id).apply()
+            prefs.edit().putInt("level_${card.id}", next).putInt("selected_card", card.id).apply()
             renderDetail(); renderCollection()
-            Toast.makeText(this, "\${card.name} upgraded to Level $next", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "${card.name} upgraded to Level $next", Toast.LENGTH_SHORT).show()
         }
         detailPanel.addView(upgrade)
     }
@@ -172,7 +172,7 @@ class MainActivity : Activity() {
         if (!::collection.isInitialized) return
         collection.removeAllViews()
         val filtered = cards.filter { it.name.contains(query, true) || it.role.contains(query, true) }
-        countLabel.text = "\${filtered.size} cards found • all unlocked • showing up to \${minOf(visibleLimit, filtered.size)}"
+        countLabel.text = "${filtered.size} cards found • all unlocked • showing up to ${minOf(visibleLimit, filtered.size)}"
         filtered.take(visibleLimit).forEach { card ->
             val level = levels[card.id] ?: 5
             val row = LinearLayout(this).apply {
@@ -185,12 +185,12 @@ class MainActivity : Activity() {
             row.addView(text(card.icon, 25f, Color.WHITE, true).apply { gravity = Gravity.CENTER; layoutParams = LinearLayout.LayoutParams(dp(42), dp(42)) })
             val labels = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(8), 0, dp(4), 0) }
             labels.addView(text(card.name, 14f, Color.WHITE, true))
-            labels.addView(text("Lv $level • \${card.role}", 11f, muted, false).apply { setPadding(0, dp(2), 0, 0) })
+            labels.addView(text("Lv $level • ${card.role}", 11f, muted, false).apply { setPadding(0, dp(2), 0, 0) })
             row.addView(labels, LinearLayout.LayoutParams(0, -2, 1f))
-            row.addView(text("HP \${(card.baseHp * boost * (1.0 + (level - 1) * .08)).roundToInt()}", 11f, mint, true))
+            row.addView(text("HP ${(card.baseHp * boost * (1.0 + (level - 1) * .08)).roundToInt()}", 11f, mint, true))
             collection.addView(row, marginBottom(6))
         }
-        if (filtered.size > visibleLimit) collection.addView(button("LOAD NEXT \${minOf(60, filtered.size - visibleLimit)} CARDS").apply { setOnClickListener { visibleLimit += 60; renderCollection() } }, marginBottom(8))
+        if (filtered.size > visibleLimit) collection.addView(button("LOAD NEXT ${minOf(60, filtered.size - visibleLimit)} CARDS").apply { setOnClickListener { visibleLimit += 60; renderCollection() } }, marginBottom(8))
         if (filtered.isEmpty()) collection.addView(text("No cards match that search. Try a different name or role.", 14f, muted, false))
     }
 
@@ -208,7 +208,7 @@ class MainActivity : Activity() {
         val theirs = power(rival, false)
         val won = yours >= theirs
         val margin = (kotlin.math.abs(yours - theirs) / maxOf(yours, theirs) * 100).roundToInt()
-        battleResult.text = "\${if (won) "VICTORY" else "DEFEAT"} • power margin $margin%\\nYour team: \${team.joinToString(", ") { it.name }}\\nRival team: \${rival.joinToString(", ") { it.name }}\\nOffline stat-based simulation; no online match or official account is involved."
+        battleResult.text = "${if (won) "VICTORY" else "DEFEAT"} • power margin $margin%\\nYour team: ${team.joinToString(", ") { it.name }}\\nRival team: ${rival.joinToString(", ") { it.name }}\\nOffline stat-based simulation; no online match or official account is involved."
     }
 
     private fun panel() = LinearLayout(this).apply {
