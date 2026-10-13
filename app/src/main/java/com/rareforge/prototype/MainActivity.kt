@@ -5,223 +5,236 @@ import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
+import android.text.Editable
+import android.text.TextWatcher
 import android.view.Gravity
 import android.widget.Button
+import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView
-import android.widget.SeekBar
 import android.widget.TextView
+import android.widget.Toast
 import kotlin.math.roundToInt
 import kotlin.random.Random
 
-private data class BattleCard(
-    val name: String,
-    val role: String,
-    val icon: String,
-    val baseHp: Int,
-    val baseDamage: Int,
-    val baseAttackSeconds: Float,
-    val baseSpeed: Float,
-    val elixir: Int
-)
+private data class BattleCard(val id: Int, val name: String, val role: String, val icon: String,
+    val baseHp: Int, val baseDamage: Int, val attackSeconds: Float, val speed: Float, val cost: Int)
 
 class MainActivity : Activity() {
-    private val cards = listOf(
-        BattleCard("Ember Guard", "Frontline • Melee", "🔥", 720, 105, 1.2f, 1.0f, 3),
-        BattleCard("Mossback", "Tank • Melee", "🌿", 1250, 78, 1.6f, 0.65f, 4),
-        BattleCard("Storm Slinger", "Ranged • Air & ground", "⚡", 440, 150, 1.7f, 0.9f, 4),
-        BattleCard("Frost Adept", "Ranged • Slow effect", "❄️", 390, 92, 1.1f, 0.8f, 3),
-        BattleCard("Sun Cleric", "Support • Healer", "☀️", 510, 65, 1.4f, 0.8f, 3),
-        BattleCard("Bombardier", "Splash • Ground", "💣", 470, 175, 2.0f, 0.7f, 4),
-        BattleCard("Rift Hound", "Fast • Melee", "🐺", 560, 118, 0.9f, 1.45f, 3),
-        BattleCard("Crystal Archer", "Ranged • Long range", "💎", 360, 125, 1.3f, 0.85f, 3),
-        BattleCard("Ironhorn", "Bruiser • Charge", "🦬", 980, 145, 1.8f, 0.75f, 5),
-        BattleCard("Gale Twins", "Swarm • Air & ground", "🌪️", 260, 58, 0.8f, 1.3f, 3),
-        BattleCard("Lava Sprout", "Siege • Area damage", "🌋", 650, 185, 2.2f, 0.55f, 5),
-        BattleCard("Moon Trickster", "Disruptor • Ranged", "🌙", 420, 105, 1.0f, 1.0f, 3)
-    )
-
+    private val prefs by lazy { getSharedPreferences("rareforge_save_v2", MODE_PRIVATE) }
+    private val levels = mutableMapOf<Int, Int>()
+    private val cards: List<BattleCard> by lazy { buildCardCatalog() }
     private var boost = 2.0f
-    private var resultText: String = "Your training arena is ready. Every card starts unlocked at Level 5."
-    private lateinit var content: LinearLayout
-    private lateinit var boostValue: TextView
-    private lateinit var resultView: TextView
-    private lateinit var cardList: LinearLayout
+    private var query = ""
+    private var visibleLimit = 60
+    private var selectedCardId = 0
+    private lateinit var root: LinearLayout
+    private lateinit var collection: LinearLayout
+    private lateinit var countLabel: TextView
+    private lateinit var battleResult: TextView
+    private lateinit var detailPanel: LinearLayout
+    private lateinit var boostLabel: TextView
+    private lateinit var searchBox: EditText
+
+    private val mint = Color.rgb(95, 220, 194)
+    private val muted = Color.rgb(184, 196, 218)
+    private val pageBackground = Color.rgb(12, 18, 35)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        window.statusBarColor = Color.rgb(12, 18, 35)
-        window.navigationBarColor = Color.rgb(12, 18, 35)
+        window.statusBarColor = pageBackground
+        window.navigationBarColor = pageBackground
+        cards.forEach { card -> levels[card.id] = prefs.getInt("level_\${card.id}", 5).coerceAtLeast(1) }
+        selectedCardId = prefs.getInt("selected_card", 0).coerceIn(0, cards.lastIndex)
         buildUi()
     }
 
+    private fun buildCardCatalog(): List<BattleCard> {
+        val originals = listOf(
+            BattleCard(0, "Ember Guard", "Frontline • Melee", "🔥", 720, 105, 1.2f, 1.0f, 3),
+            BattleCard(1, "Mossback", "Tank • Melee", "🌿", 1250, 78, 1.6f, .65f, 4),
+            BattleCard(2, "Storm Slinger", "Ranged • Air & ground", "⚡", 440, 150, 1.7f, .9f, 4),
+            BattleCard(3, "Frost Adept", "Ranged • Slow", "❄️", 390, 92, 1.1f, .8f, 3),
+            BattleCard(4, "Sun Cleric", "Support • Healer", "☀️", 510, 65, 1.4f, .8f, 3),
+            BattleCard(5, "Bombardier", "Splash • Ground", "💣", 470, 175, 2.0f, .7f, 4),
+            BattleCard(6, "Rift Hound", "Fast • Melee", "🐺", 560, 118, .9f, 1.45f, 3),
+            BattleCard(7, "Crystal Archer", "Ranged • Long range", "💎", 360, 125, 1.3f, .85f, 3),
+            BattleCard(8, "Ironhorn", "Bruiser • Charge", "🦬", 980, 145, 1.8f, .75f, 5),
+            BattleCard(9, "Gale Twins", "Swarm • Air & ground", "🌪️", 260, 58, .8f, 1.3f, 3),
+            BattleCard(10, "Lava Sprout", "Siege • Area damage", "🌋", 650, 185, 2.2f, .55f, 5),
+            BattleCard(11, "Moon Trickster", "Disruptor • Ranged", "🌙", 420, 105, 1.0f, 1.0f, 3)
+        )
+        val prefixes = listOf("Ashen", "Astral", "Bramble", "Celestial", "Dusk", "Elder", "Feral", "Glacial", "Hollow", "Ivory", "Jade", "Kindled", "Lunar", "Mystic", "Nova", "Obsidian", "Primal", "Quartz", "Runic", "Solar")
+        val nouns = listOf("Guardian", "Archer", "Warden", "Beast", "Mage", "Rider", "Sentinel", "Ranger", "Golem", "Invoker", "Stalker", "Oracle", "Brawler", "Elemental", "Drake", "Alchemist", "Knight", "Seer", "Vanguard", "Phantom", "Druid")
+        val icons = listOf("🛡️", "🏹", "🧙", "🐉", "🗡️", "✨", "🦅", "🪨", "🌊", "🌩️", "🌱", "🔮")
+        val roles = listOf("Frontline", "Ranged", "Tank", "Support", "Skirmisher", "Siege", "Disruptor", "Air unit")
+        val generated = (0 until 420).map { index ->
+            val id = originals.size + index
+            val hp = 300 + ((index * 73) % 1050) + (index / 420) * 7
+            val damage = 45 + ((index * 37) % 190) + index / 420
+            BattleCard(id, "\${prefixes[index % prefixes.size]} \${nouns[(index / prefixes.size) % nouns.size]} \${index + 1}",
+                roles[index % roles.size], icons[index % icons.size], hp, damage, .7f + (index % 16) * .1f,
+                .55f + (index % 12) * .1f, 2 + index % 5)
+        }
+        return originals + generated
+    }
+
     private fun buildUi() {
-        val scroll = ScrollView(this).apply {
-            setBackgroundColor(Color.rgb(12, 18, 35))
-            isFillViewport = true
-        }
-        content = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(18), dp(18), dp(18), dp(28))
-        }
-        scroll.addView(content)
+        val scroll = ScrollView(this).apply { setBackgroundColor(pageBackground); isFillViewport = true }
+        root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(16), dp(18), dp(16), dp(28)) }
+        scroll.addView(root)
         setContentView(scroll)
 
-        addText("RAREFORGE", 13f, Color.rgb(95, 220, 194), true, bottom = 4)
-        addText("Level 5 • Boost Lab", 29f, Color.WHITE, true, bottom = 5)
-        addText(
-            "An original offline card-battle sandbox. All 12 prototype Rare units are unlocked; no official game account or server is connected.",
-            14f, Color.rgb(184, 196, 218), false, bottom = 16
-        )
+        addText("RAREFORGE • OFFLINE SANDBOX", 12f, mint, true, bottom = 5)
+        addText("Collection Overdrive", 29f, Color.WHITE, true, bottom = 5)
+        addText("Standalone original card-battle prototype. Progress is saved on this device; it does not modify or connect to the official game.", 14f, muted, false, bottom = 14)
 
-        val statsPanel = panel()
-        statsPanel.addView(text("LOADOUT STATUS", 12f, Color.rgb(95, 220, 194), true))
-        statsPanel.addView(text("12 / 12 cards unlocked    •    Level 5", 17f, Color.WHITE, true).apply {
-            setPadding(0, dp(7), 0, dp(4))
-        })
-        statsPanel.addView(text("Boost multiplier applies to hitpoints and damage. Attack interval and movement speed are shown as base stats.", 13f, Color.rgb(184, 196, 218), false))
-        content.addView(statsPanel, marginBottom(14))
+        val economy = panel()
+        economy.addView(text("SANDBOX ACCOUNT", 12f, mint, true))
+        economy.addView(text("Coins  ∞     Gems  ∞     Cards unlocked  \${cards.size}", 18f, Color.WHITE, true).apply { setPadding(0, dp(7), 0, dp(4)) })
+        economy.addView(text("Unlimited local sandbox currency • every catalog card is available • upgrades save automatically", 13f, muted, false))
+        root.addView(economy, marginBottom(12))
 
         val boostPanel = panel()
-        boostPanel.addView(text("STAT BOOST", 12f, Color.rgb(95, 220, 194), true))
-        boostValue = text("2.0× multiplier", 22f, Color.WHITE, true).apply {
-            setPadding(0, dp(6), 0, dp(2))
-        }
-        boostPanel.addView(boostValue)
-        val seek = SeekBar(this).apply {
-            max = 40
-            progress = 10
-            thumbTintList = android.content.res.ColorStateList.valueOf(Color.rgb(95, 220, 194))
-            progressTintList = android.content.res.ColorStateList.valueOf(Color.rgb(95, 220, 194))
-            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-                override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                    boost = 1.0f + progress / 10f
-                    boostValue.text = String.format("%.1f× multiplier", boost)
-                    renderCards()
-                }
-                override fun onStartTrackingTouch(seekBar: SeekBar?) {}
-                override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+        boostPanel.addView(text("GLOBAL STAT BOOST", 12f, mint, true))
+        boostLabel = text("2.00× multiplier", 21f, Color.WHITE, true).apply { setPadding(0, dp(5), 0, dp(2)) }
+        boostPanel.addView(boostLabel)
+        val controls = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+        controls.addView(button("−").apply { setOnClickListener { setBoost((boost - .25f).coerceAtLeast(1f)) } }, LinearLayout.LayoutParams(0, dp(44), 1f).apply { marginEnd = dp(8) })
+        controls.addView(button("+").apply { setOnClickListener { setBoost((boost + .25f).coerceAtMost(5f)) }, LinearLayout.LayoutParams(0, dp(44), 1f))
+        boostPanel.addView(controls)
+        boostPanel.addView(text("Adjust HP and damage from 1.0× to 5.0×.", 12f, muted, false).apply { setPadding(0, dp(4), 0, 0) })
+        root.addView(boostPanel, marginBottom(12))
+
+        val battle = panel()
+        battle.addView(text("BATTLE ARENA", 12f, mint, true))
+        battle.addView(text("Run a local roster-vs-roster battle using card stats, attack rate, speed, and levels.", 13f, muted, false).apply { setPadding(0, dp(5), 0, dp(9)) })
+        battle.addView(button("FIGHT A RANDOM RIVAL").apply { setOnClickListener { runBattle() } })
+        battleResult = text("Choose Fight to test your roster.", 14f, Color.WHITE, true).apply { setPadding(0, dp(10), 0, 0) }
+        battle.addView(battleResult)
+        root.addView(battle, marginBottom(16))
+
+        addText("CARD COLLECTION", 12f, mint, true, bottom = 4)
+        countLabel = addText("Loading collection…", 13f, muted, false, bottom = 8)
+        searchBox = EditText(this).apply {
+            hint = "Search 432 cards by name or role…"
+            setSingleLine(true); textSize = 15f; setTextColor(Color.WHITE); setHintTextColor(Color.rgb(125, 143, 170))
+            setPadding(dp(14), dp(10), dp(14), dp(10))
+            background = roundBg(Color.rgb(22, 32, 54), 12, Color.rgb(42, 58, 85))
+            addTextChangedListener(object : TextWatcher {
+                override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+                override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) { query = s?.toString()?.trim().orEmpty(); visibleLimit = 60; renderCollection() }
+                override fun afterTextChanged(s: Editable?) {}
             })
         }
-        boostPanel.addView(seek)
-        boostPanel.addView(text("Range: 1.0× to 5.0× • Default: 2.0×", 12f, Color.rgb(184, 196, 218), false))
-        content.addView(boostPanel, marginBottom(14))
+        root.addView(searchBox, marginBottom(10))
+        detailPanel = panel()
+        root.addView(detailPanel, marginBottom(12))
+        collection = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        root.addView(collection)
+        renderDetail()
+        renderCollection()
+        addText("Created by Satyendra Kumar Namdeo • Independent prototype.", 11f, Color.rgb(120, 137, 164), false, top = 18)
+    }
 
-        val battlePanel = panel()
-        battlePanel.addView(text("QUICK BATTLE", 12f, Color.rgb(95, 220, 194), true))
-        battlePanel.addView(text("Run a lightweight local simulation using your boosted roster.", 14f, Color.rgb(184, 196, 218), false).apply {
-            setPadding(0, dp(6), 0, dp(10))
-        })
-        val battleButton = button("SIMULATE BATTLE")
-        battleButton.setOnClickListener { simulateBattle() }
-        battlePanel.addView(battleButton)
-        resultView = text(resultText, 14f, Color.WHITE, true).apply {
-            setPadding(0, dp(12), 0, 0)
+    private fun setBoost(value: Float) {
+        boost = (value * 100).roundToInt() / 100f
+        boostLabel.text = String.format("%.2f× multiplier", boost)
+        renderDetail()
+        renderCollection()
+    }
+
+    private fun renderDetail() {
+        if (!::detailPanel.isInitialized) return
+        detailPanel.removeAllViews()
+        val card = cards[selectedCardId.coerceIn(0, cards.lastIndex)]
+        val level = levels[card.id] ?: 5
+        detailPanel.addView(text("SELECTED CARD • LEVEL $level", 11f, mint, true))
+        detailPanel.addView(text("\${card.icon}  \${card.name}", 21f, Color.WHITE, true).apply { setPadding(0, dp(5), 0, dp(5)) })
+        detailPanel.addView(text("\${card.role}   •   Unlocked", 13f, muted, false))
+        val factor = 1.0 + (level - 1) * .08
+        detailPanel.addView(text("HP  \${(card.baseHp * boost * factor).roundToInt()}     Damage  \${(card.baseDamage * boost * factor).roundToInt()}", 15f, Color.WHITE, true).apply { setPadding(0, dp(8), 0, dp(3)) })
+        detailPanel.addView(text("Attack interval: \${String.format("%.1f", card.attackSeconds)}s  •  Speed: \${String.format("%.2f", card.speed)}  •  Cost: \${card.cost}", 12f, muted, false))
+        val upgrade = button(if (level >= 100) "MAX LEVEL REACHED" else "UPGRADE LEVEL • FREE")
+        upgrade.isEnabled = level < 100
+        upgrade.alpha = if (level >= 100) .55f else 1f
+        upgrade.setOnClickListener {
+            val next = ((levels[card.id] ?: 5) + 1).coerceAtMost(100)
+            levels[card.id] = next
+            prefs.edit().putInt("level_\${card.id}", next).putInt("selected_card", card.id).apply()
+            renderDetail(); renderCollection()
+            Toast.makeText(this, "\${card.name} upgraded to Level $next", Toast.LENGTH_SHORT).show()
         }
-        battlePanel.addView(resultView)
-        content.addView(battlePanel, marginBottom(18))
-
-        addText("YOUR RARE ROSTER", 12f, Color.rgb(95, 220, 194), true, bottom = 4)
-        addText("Tap a card to inspect its boosted stats.", 14f, Color.rgb(184, 196, 218), false, bottom = 10)
-        cardList = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        content.addView(cardList)
-        renderCards()
-
-        addText("Prototype only • Original names and emoji icons • Not affiliated with Supercell", 11f, Color.rgb(120, 137, 164), false, top = 18)
+        detailPanel.addView(upgrade)
     }
 
-    private fun renderCards() {
-        if (!::cardList.isInitialized) return
-        cardList.removeAllViews()
-        cards.forEach { card ->
-            val box = panel()
-            val header = LinearLayout(this).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.CENTER_VERTICAL
+    private fun renderCollection() {
+        if (!::collection.isInitialized) return
+        collection.removeAllViews()
+        val filtered = cards.filter { it.name.contains(query, true) || it.role.contains(query, true) }
+        countLabel.text = "\${filtered.size} cards found • all unlocked • showing up to \${minOf(visibleLimit, filtered.size)}"
+        filtered.take(visibleLimit).forEach { card ->
+            val level = levels[card.id] ?: 5
+            val row = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
+                setPadding(dp(12), dp(10), dp(12), dp(10))
+                background = roundBg(if (card.id == selectedCardId) Color.rgb(32, 57, 75) else Color.rgb(22, 32, 54), 14, if (card.id == selectedCardId) mint else Color.rgb(42, 58, 85))
+                isClickable = true; isFocusable = true
+                setOnClickListener { selectedCardId = card.id; prefs.edit().putInt("selected_card", card.id).apply(); renderDetail(); renderCollection() }
             }
-            val icon = text(card.icon, 28f, Color.WHITE, true).apply {
-                gravity = Gravity.CENTER
-                background = roundBg(Color.rgb(38, 52, 79), 14)
-                layoutParams = LinearLayout.LayoutParams(dp(54), dp(54)).apply { marginEnd = dp(12) }
-            }
-            header.addView(icon)
-            val titleColumn = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-            titleColumn.addView(text(card.name, 17f, Color.WHITE, true))
-            titleColumn.addView(text("${card.role}  •  Level 5  •  Unlocked", 12f, Color.rgb(95, 220, 194), false).apply {
-                setPadding(0, dp(3), 0, 0)
-            })
-            header.addView(titleColumn, LinearLayout.LayoutParams(0, -2, 1f))
-            box.addView(header)
-
-            val hp = (card.baseHp * boost).roundToInt()
-            val damage = (card.baseDamage * boost).roundToInt()
-            val interval = String.format("%.1f", card.baseAttackSeconds)
-            val speed = String.format("%.2f", card.baseSpeed)
-            box.addView(text("HP  $hp     Damage  $damage", 14f, Color.WHITE, true).apply {
-                setPadding(0, dp(12), 0, dp(3))
-            })
-            box.addView(text("Attack interval: ${interval}s   •   Move speed: $speed   •   Cost: ${card.elixir}", 12f, Color.rgb(184, 196, 218), false))
-            val inspect = button("INSPECT STATS")
-            inspect.setOnClickListener {
-                resultText = "${card.name}: Level 5 • ${boost}× boost • HP $hp • Damage $damage • Attack interval ${interval}s • Move speed $speed."
-                resultView.text = resultText
-            }
-            box.addView(inspect)
-            cardList.addView(box, marginBottom(10))
+            row.addView(text(card.icon, 25f, Color.WHITE, true).apply { gravity = Gravity.CENTER; layoutParams = LinearLayout.LayoutParams(dp(42), dp(42)) })
+            val labels = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(8), 0, dp(4), 0) }
+            labels.addView(text(card.name, 14f, Color.WHITE, true))
+            labels.addView(text("Lv $level • \${card.role}", 11f, muted, false).apply { setPadding(0, dp(2), 0, 0) })
+            row.addView(labels, LinearLayout.LayoutParams(0, -2, 1f))
+            row.addView(text("HP \${(card.baseHp * boost * (1.0 + (level - 1) * .08)).roundToInt()}", 11f, mint, true))
+            collection.addView(row, marginBottom(6))
         }
+        if (filtered.size > visibleLimit) collection.addView(button("LOAD NEXT \${minOf(60, filtered.size - visibleLimit)} CARDS").apply { setOnClickListener { visibleLimit += 60; renderCollection() } }, marginBottom(8))
+        if (filtered.isEmpty()) collection.addView(text("No cards match that search. Try a different name or role.", 14f, muted, false))
     }
 
-    private fun simulateBattle() {
-        val playerPower = cards.shuffled().take(4).sumOf { (it.baseHp * boost + it.baseDamage * boost * 3).toDouble() }
-        val rivalBoost = Random.nextDouble(1.4, 2.3)
-        val rivalPower = cards.shuffled().take(4).sumOf { (it.baseHp * rivalBoost + it.baseDamage * rivalBoost * 3).toDouble() }
-        val winner = if (playerPower >= rivalPower) "VICTORY" else "DEFEAT"
-        val margin = (kotlin.math.abs(playerPower - rivalPower) / maxOf(playerPower, rivalPower) * 100).roundToInt()
-        resultText = "$winner  •  Local simulation\nYour roster power: ${playerPower.roundToInt()}  |  Rival power: ${rivalPower.roundToInt()}\nPower difference: $margin%. This is a lightweight prototype simulation, not the official game's battle engine."
-        resultView.text = resultText
+    private fun runBattle() {
+        val team = cards.shuffled().take(4)
+        val rival = cards.shuffled().take(4)
+        fun power(roster: List<BattleCard>, player: Boolean): Double = roster.sumOf { card ->
+            val level = if (player) (levels[card.id] ?: 5) else Random.nextInt(3, 16)
+            val factor = 1.0 + (level - 1) * .08
+            val dps = card.baseDamage * boost * factor / card.attackSeconds
+            val hp = card.baseHp * boost * factor
+            hp * .45 + dps * 16 + card.speed * 45
+        }
+        val yours = power(team, true)
+        val theirs = power(rival, false)
+        val won = yours >= theirs
+        val margin = (kotlin.math.abs(yours - theirs) / maxOf(yours, theirs) * 100).roundToInt()
+        battleResult.text = "\${if (won) "VICTORY" else "DEFEAT"} • power margin $margin%\\nYour team: \${team.joinToString(", ") { it.name }}\\nRival team: \${rival.joinToString(", ") { it.name }}\\nOffline stat-based simulation; no online match or official account is involved."
     }
 
-    private fun panel(): LinearLayout = LinearLayout(this).apply {
-        orientation = LinearLayout.VERTICAL
-        setPadding(dp(14), dp(14), dp(14), dp(14))
+    private fun panel() = LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL; setPadding(dp(14), dp(14), dp(14), dp(14))
         background = roundBg(Color.rgb(22, 32, 54), 18, Color.rgb(42, 58, 85))
     }
 
-    private fun addText(value: String, size: Float, color: Int, bold: Boolean, top: Int = 0, bottom: Int = 0) {
-        content.addView(text(value, size, color, bold).apply {
-            setPadding(0, dp(top), 0, dp(bottom))
-        })
+    private fun addText(value: String, size: Float, color: Int, bold: Boolean, top: Int = 0, bottom: Int = 0): TextView =
+        text(value, size, color, bold).also { it.setPadding(0, dp(top), 0, dp(bottom)); root.addView(it) }
+
+    private fun text(value: String, size: Float, color: Int, bold: Boolean) = TextView(this).apply {
+        text = value; textSize = size; setTextColor(color)
+        if (bold) typeface = Typeface.create("sans-serif", Typeface.BOLD)
+        setLineSpacing(dp(2).toFloat(), 1.0f)
     }
 
-    private fun text(value: String, size: Float, color: Int, bold: Boolean): TextView =
-        TextView(this).apply {
-            text = value
-            textSize = size
-            setTextColor(color)
-            if (bold) typeface = Typeface.create("sans-serif", Typeface.BOLD)
-            setLineSpacing(dp(2).toFloat(), 1.0f)
-        }
-
-    private fun button(label: String): Button = Button(this).apply {
-        text = label
-        textSize = 12f
-        setTextColor(Color.rgb(12, 18, 35))
-        background = roundBg(Color.rgb(95, 220, 194), 12)
-        isAllCaps = false
-        typeface = Typeface.DEFAULT_BOLD
-        minHeight = dp(44)
-        setPadding(dp(10), 0, dp(10), 0)
+    private fun button(label: String) = Button(this).apply {
+        text = label; textSize = 12f; setTextColor(pageBackground); background = roundBg(mint, 12)
+        isAllCaps = false; typeface = Typeface.DEFAULT_BOLD; minHeight = dp(44); setPadding(dp(10), 0, dp(10), 0)
     }
 
-    private fun roundBg(color: Int, radius: Int, strokeColor: Int? = null): GradientDrawable =
-        GradientDrawable().apply {
-            setColor(color)
-            cornerRadius = dp(radius).toFloat()
-            if (strokeColor != null) setStroke(dp(1), strokeColor)
-        }
+    private fun roundBg(color: Int, radius: Int, strokeColor: Int? = null) = GradientDrawable().apply {
+        setColor(color); cornerRadius = dp(radius).toFloat()
+        if (strokeColor != null) setStroke(dp(1), strokeColor)
+    }
 
-    private fun marginBottom(value: Int): LinearLayout.LayoutParams =
-        LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(value) }
-
+    private fun marginBottom(value: Int) = LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(value) }
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).roundToInt()
 }
